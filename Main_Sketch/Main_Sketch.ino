@@ -5,6 +5,7 @@
 #include <ros/time.h>
 #include <geometry_msgs/Twist.h>
 #include <arduino_msgs/Encoders.h>
+#include <std_msgs/Bool.h>
 
 Chrono timer;
 Chrono odom_timer;
@@ -19,6 +20,7 @@ Chrono odom_timer;
 #define encoderPinB 11    //Encoder1 B
 #define encoderPinC 2     //Encoder2 - left engine A
 #define encoderPinD 10    //Encoder2 B
+#define lidarPin 22     //3.3V for lidar's motoclk pin to start spinning (arduino sets 5V in GPIO, voltage divider needed)
 
 // Robot constants
 #define R 0.065
@@ -74,21 +76,28 @@ ros::Publisher odom_pub("encoders", &encoders);
 void velCallback(const geometry_msgs::Twist &twist);
 ros::Subscriber<geometry_msgs::Twist> vel_sub("cmd_vel", &velCallback);
 
+// Lidar ON/OFF subscriber
+void lidarCallback(const std_msgs::Bool &Bool);
+ros::Subscriber<std_msgs::Bool> lidar_sub("lidarON", &lidarCallback);
+
 
 void setup(void)
 {
   int i;
   for(i=4;i<=7;i++)
-  pinMode(i, OUTPUT);  
+  pinMode(i, OUTPUT); 
+  pinMode(lidarPin, OUTPUT); 
   Serial.begin(115200);      //Set Baud Rate
   Serial.setTimeout(7);
   digitalWrite(E1,LOW);  
   digitalWrite(E2,LOW);
+  digitalWrite(lidarPin, LOW);
 
   // ROS initialization
   nh.initNode();
   nh.advertise(odom_pub);
   nh.subscribe(vel_sub);
+  nh.subscribe(lidar_sub);
   
  
   pinMode(encoderPinA, INPUT); 
@@ -234,7 +243,8 @@ void stop(void)                    //Stop
   digitalWrite(M2,LOW);    
 }  
 
-void velCallback( const geometry_msgs::Twist &twist){
+void velCallback( const geometry_msgs::Twist &twist)
+{
   float Vr;
   float Vl;
   int Rdir;
@@ -266,6 +276,14 @@ void velCallback( const geometry_msgs::Twist &twist){
     left_motor_pwm = (Vl*9)/Vmax;
   else 
     left_motor_pwm = 9;
+}
+
+void lidarCallback(const std_msgs::Bool &Bool)
+{
+  if (Bool.data == true)
+    digitalWrite(lidarPin, HIGH);
+  else
+    digitalWrite(lidarPin, LOW);
 }
 
 void current_sense()                  // current sense and diagnosis
